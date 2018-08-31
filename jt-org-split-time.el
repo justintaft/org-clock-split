@@ -41,7 +41,7 @@
    Total time of created entries will be the same as original entry. 
 
    WARNING: Negative time entries can be created if splitting at an offset longer
-   then the CLOCK entry's total time. "
+   then the CLOCK entry's total time. 
 
    Ex: If cursor is on 
 
