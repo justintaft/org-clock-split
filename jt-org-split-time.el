@@ -25,14 +25,13 @@
     total-minutes))
 
 (defun jt/org-get-next-time-string ()
-    (let ((time-string ""))
+    (let ((time-string "")
+          (first-position nil))        
       (re-search-forward "\\[")
       (backward-char)
-      (push-mark)
+      (setq first-position (point))
       (re-search-forward "\\]")
-      (activate-mark)
-      (setq time-string (buffer-substring (mark) (point)))
-      (deactivate-mark)
+      (setq time-string (buffer-substring first-position (point)))
       time-string))
 
 (defun jt/org-split-time (time-string)
@@ -61,6 +60,7 @@
   (let ((original-line "")
         (clockin-text "")
         (clockout-text "")
+        (temp-position nil)
         (parsed-minutes (jt/org-split-time-string-to-minutes time-string)))
   
     (move-beginning-of-line nil)
@@ -93,7 +93,7 @@
     
     ;Navigate to colon and subtract 
     ;modify timestamp
-    (org-timestamp-change parsed-minutes  'minute )
+    (org-timestamp-change parsed-minutes  'minute)
     
     ;Grab final time
     (re-search-backward "]-")
@@ -104,16 +104,11 @@
 
     (re-search-forward "\\[")
     (backward-char)
-    (push-mark)
+    (setq tmp-position (point))
     (re-search-forward "\\]") 
-    (activate-mark)
-    (delete-region (mark) (point))
-    (deactivate-mark)
-
+    (delete-region tmp-position (point))
 
     (insert clockout-text)
     
     ;update timestamp to reflect new value
-    (org-ctrl-c-ctrl-c)
-
-))
+    (org-ctrl-c-ctrl-c)))
