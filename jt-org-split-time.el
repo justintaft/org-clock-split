@@ -1,6 +1,7 @@
 (defun jt/org-split-time-string-to-minutes (time-string)
   "Return minutes given a time string in format. 
-  Example strings: 1h, 01m, 1h2m, 68m1h"
+   Throws error when invalid time string is given.
+   Example strings: 1h, 01m, 1h2m, 68m1h"
   
 
   ;remove all whitespace from string
@@ -10,20 +11,18 @@
   (let ((total-minutes 0)
         (matched-input-characters 0))
 
-    (if (string-match "\\([0-9]+\\)h" time-string)
-      (progn 
-        (setq total-minutes (* 60 (string-to-number (match-string 1 time-string))))
-        (setq matched-input-characters (+ 1 (length (match-string 1 time-string))))))
+    (when (string-match "\\([0-9]+\\)h" time-string)
+      (cl-incf total-minutes (* 60 (string-to-number (match-string 1 time-string))))
+      (cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
 
-    (if (string-match "\\([0-9]+\\)m" time-string)
-        (progn
-          (setq total-minutes (+ total-minutes (string-to-number (match-string 1 time-string))))
-          (setq matched-input-characters (+ matched-input-characters 1 (length (match-string 1 time-string))))))
+    (when (string-match "\\([0-9]+\\)m" time-string)
+      (cl-incf total-minutes (string-to-number (match-string 1 time-string)))
+      (cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
         
     (if (/= matched-input-characters (length time-string))
-        (error "Invalid time string format."))
+      (error "Invalid time string format.")) 
 
-     total-minutes))
+    total-minutes))
 
 (defun jt/org-get-next-time-string ()
     (let ((time-string ""))
