@@ -3,8 +3,8 @@
    Throws error when invalid time string is given.
    Example strings: 1h, 01m, 1h2m, 68m1h"
   
-
-  ;remove all whitespace from string
+  ;; Remove all whitespace from string.
+  ;; This is so sanity check can occur to verify entire string has been processed.
   (if (string-match "[ \t]+" time-string)
     (setq time-string (replace-match  "" t t time-string)))
 
@@ -25,8 +25,7 @@
     total-minutes))
 
 (defun jt/org-get-next-time-string ()
-    (let ((time-string "")
-          (first-position nil))        
+    (let (time-string first-position)        
       (re-search-forward "\\[")
       (backward-char)
       (setq first-position (point))
@@ -53,49 +52,40 @@
    CLOCK: [2018-08-30 Thu 12:19]--[2018-08-30 Thu 13:21] =>  1:02
    CLOCK: [2018-08-30 Thu 13:21]--[2018-08-30 Thu 16:05] =>  2:44"
 
-   
-
   (interactive "sTime offset to split clock entry (ex 1h2m): ")
 
-  (let ((original-line "")
-        (clockin-text "")
-        (clockout-text "")
-        (temp-position nil)
-        (parsed-minutes (jt/org-split-time-string-to-minutes time-string)))
-  
-    (move-beginning-of-line nil)
+  (let ((parsed-minutes (jt/org-split-time-string-to-minutes time-string))
+         original-line clockin-text clockout-text temp-position)
     
-
-    ;Copy line
+    ;; Copy line
+    (move-beginning-of-line nil)
     (setq original-line (buffer-substring (line-beginning-position) (line-beginning-position 2)))
 
-    ;Error if CLOCK line does not contain check in and check out time
+    ;; Error if CLOCK line does not contain check in and check out time
     (if (not (string-match  org-ts-regexp-both  original-line))
       (error "Cursor must be placed on line with valid CLOCK entry."))
 
-    
     (move-end-of-line nil)
     (newline)
     (insert original-line)
     (delete-char 1)
     
-    ;Move to previous line
+    ;; Move to previous line
     (previous-line)
     (previous-line)
      
-    
-    ;Copy start time to end time
+    ;; Copy start time to end time
     (setq clockin-text (jt/org-get-next-time-string))
 
     (re-search-forward "--")
     (kill-line)
     (insert clockin-text)
     
-    ;Navigate to colon and subtract 
-    ;modify timestamp
+    ;; Update timestamp with parsed minutes
     (org-timestamp-change parsed-minutes  'minute)
     
-    ;Grab final time
+    ;; Create copy of created end time, as new record
+    ;; will start at this time. 
     (re-search-backward "]-")
     (setq clockout-text (jt/org-get-next-time-string))
     
@@ -110,5 +100,5 @@
 
     (insert clockout-text)
     
-    ;update timestamp to reflect new value
+    ;; Update timestamp to reflect new value
     (org-ctrl-c-ctrl-c)))
