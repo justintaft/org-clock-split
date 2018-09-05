@@ -40,7 +40,7 @@ Throws error when invalid time string is given.
     (setq time-string (buffer-substring first-position (point)))
     time-string))
 
-(defun org-split-clock-split-time (time-string)
+(defun org-split-clock-entry (time-string)
   "Split CLOCK entry at offset in to two entries. 
    Total time of created entries will be the same as original entry. 
 
