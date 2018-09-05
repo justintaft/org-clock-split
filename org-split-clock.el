@@ -1,9 +1,10 @@
-;;; org-split-clock.el --- Split clock entries
+;;; org-split-clock.el --- Split clock entries -*- lexical-binding: t; -*-
 
 ;; Author: Justin Taft <https://github.com/justintaft>
 ;; Keywords: calendar
 ;; URL: https://github.com/justintaft/emacs-org-split-clock
 ;; Version: 1.0
+;; Package-Requires: ((emacs "24"))
 
 ;;; Contributors
 ;;  https://github.com/swflint
