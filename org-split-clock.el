@@ -1,17 +1,40 @@
-;;; org-split-clock.el --- Split clock entries
+;;; org-split-clock.el --- Split clock entries -*- lexical-binding: t; -*-
+
+;; Author: Justin Taft <https://github.com/justintaft>
+;; Keywords: org, clock
+;; URL: https://github.com/justintaft/emacs-org-split-clock
+
+;;; Contributors
+;;  https://github.com/swflint
+;;  https://github.com/alphapapa
 
 ;;; Commentary:
-;; 
+;;
+;;  This package provides ability to split an org CLOCK entry into two records.
+;;
+;;  Usage example:
+;;
+;;  If cursor is on
+;;
+;;  CLOCK: [2018-08-30 Thu 12:19]--[2018-08-30 Thu 16:05] =>  3:46
+;;  
+;;  Running
+;;
+;;  (org-split-clock \"1h2m\")
+;;  
+;;  Will produce
+;;
+;;  CLOCK: [2018-08-30 Thu 12:19]--[2018-08-30 Thu 13:21] =>  1:02
+;;  CLOCK: [2018-08-30 Thu 13:21]--[2018-08-30 Thu 16:05] =>  2:44"
 
 ;;; Code:
-
 (defun org-split-clock-split-time-string-to-minutes (time-string)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
-   Example strings: 1h, 01m, 1h2m, 68m1h"
+   TIME-STRING - Time offset to split record at.  (Ex '1h', '01m', '68m1h')"
   
-  ;; Remove all whitespace from string.
-  ;; This is so sanity check can occur to verify entire string has been processed.
+  ;; Remove all whitespace from string for sanity checks.
+  ;; Used to ensure all characters are processed.
   (if (string-match "[ \t]+" time-string)
       (setq time-string (replace-match  "" t t time-string)))
 
@@ -27,11 +50,12 @@ Throws error when invalid time string is given.
       (cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
     
     (if (/= matched-input-characters (length time-string))
-        (error "Invalid time string format."))
+        (error "Invalid time string format"))
 
     total-minutes))
 
 (defun org-split-clock-get-next-time-string ()
+  "Gets next time string in CLOCK entry in buffer relative to cursor position."
   (let (time-string first-position)
     (re-search-forward "\\[")
     (backward-char)
@@ -41,23 +65,13 @@ Throws error when invalid time string is given.
     time-string))
 
 (defun org-split-clock-entry (time-string)
-  "Split CLOCK entry at offset in to two entries. 
-   Total time of created entries will be the same as original entry. 
+  "Split CLOCK entry under cursor into two entries.
+Total time of created entries will be the same as original entry.
 
-   WARNING: Negative time entries can be created if splitting at an offset longer
-   then the CLOCK entry's total time. 
+   WARNING: Negative time entries can be created if splitting at an offset
+longer then the CLOCK entry's total time.
 
-   Ex: If cursor is on 
-
-   CLOCK: [2018-08-30 Thu 12:19]--[2018-08-30 Thu 16:05] =>  3:46
-   
-   Running
-   (org-split-clock-split-time \"1h2m\") 
-   
-   Will produce
-
-   CLOCK: [2018-08-30 Thu 12:19]--[2018-08-30 Thu 13:21] =>  1:02
-   CLOCK: [2018-08-30 Thu 13:21]--[2018-08-30 Thu 16:05] =>  2:44"
+   TIME-STRING: Time offset to split record at.  Examples: '1h', '01m', '68m1h'."
 
   (interactive "sTime offset to split clock entry (ex 1h2m): ")
 
@@ -70,7 +84,7 @@ Throws error when invalid time string is given.
 
     ;; Error if CLOCK line does not contain check in and check out time
     (if (not (string-match  org-ts-regexp-both  original-line))
-        (error "Cursor must be placed on line with valid CLOCK entry."))
+        (error "Cursor must be placed on line with valid CLOCK entry"))
 
     (move-end-of-line nil)
     (newline)
@@ -92,9 +106,9 @@ Throws error when invalid time string is given.
     (org-timestamp-change parsed-minutes  'minute)
     
     ;; Create copy of created end time, as new record
-    ;; will start at this time. 
+    ;; will start at this time.
     (re-search-backward "]-")
-    (setq clockout-text (org-split-clock- get-next-time-string))
+    (setq clockout-text (org-split-clock-get-next-time-string))
     
     (forward-line 1)
     (move-beginning-of-line nil)
@@ -102,7 +116,7 @@ Throws error when invalid time string is given.
     (re-search-forward "\\[")
     (backward-char)
     (setq tmp-position (point))
-    (re-search-forward "\\]") 
+    (re-search-forward "\\]")
     (delete-region tmp-position (point))
 
     (insert clockout-text)
