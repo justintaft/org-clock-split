@@ -1,8 +1,8 @@
-;;; org-split-clock.el --- Split clock entries -*- lexical-binding: t; -*-
+;;; org-clock-split.el --- Split clock entries -*- lexical-binding: t; -*-
 
 ;; Author: Justin Taft <https://github.com/justintaft>
 ;; Keywords: calendar
-;; URL: https://github.com/justintaft/emacs-org-split-clock
+;; URL: https://github.com/justintaft/emacs-org-clock-split
 ;; Version: 1.0
 ;; Package-Requires: ((emacs "24"))
 
@@ -22,7 +22,7 @@
 ;;  
 ;;  Running
 ;;
-;;  (org-split-clock \"1h2m\")
+;;  (org-clock-split \"1h2m\")
 ;;  
 ;;  Will produce
 ;;
@@ -30,7 +30,7 @@
 ;;  CLOCK: [2018-08-30 Thu 13:21]--[2018-08-30 Thu 16:05] =>  2:44"
 
 ;;; Code:
-(defun org-split-clock-split-time-string-to-minutes (time-string)
+(defun org-clock-split-split-time-string-to-minutes (time-string)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
    TIME-STRING - Time offset to split record at.  (Ex '1h', '01m', '68m1h')"
@@ -56,7 +56,7 @@ Throws error when invalid time string is given.
 
     total-minutes))
 
-(defun org-split-clock-get-next-time-string ()
+(defun org-clock-split-get-next-time-string ()
   "Gets next time string in CLOCK entry in buffer relative to cursor position."
   (let (time-string first-position)
     (re-search-forward "\\[")
@@ -66,7 +66,7 @@ Throws error when invalid time string is given.
     (setq time-string (buffer-substring first-position (point)))
     time-string))
 
-(defun org-split-clock-entry (time-string)
+(defun org-clock-split  (time-string)
   "Split CLOCK entry under cursor into two entries.
 Total time of created entries will be the same as original entry.
 
@@ -77,7 +77,7 @@ longer then the CLOCK entry's total time.
 
   (interactive "sTime offset to split clock entry (ex 1h2m): ")
 
-  (let ((parsed-minutes (org-split-clock-split-time-string-to-minutes time-string))
+  (let ((parsed-minutes (org-clock-split-split-time-string-to-minutes time-string))
         original-line clockin-text clockout-text temp-position)
     
     ;; Copy line
@@ -98,7 +98,7 @@ longer then the CLOCK entry's total time.
     (previous-line)
     
     ;; Copy start time to end time
-    (setq clockin-text (org-split-clock-get-next-time-string))
+    (setq clockin-text (org-clock-split-get-next-time-string))
 
     (re-search-forward "--")
     (kill-line)
@@ -110,7 +110,7 @@ longer then the CLOCK entry's total time.
     ;; Create copy of created end time, as new record
     ;; will start at this time.
     (re-search-backward "]-")
-    (setq clockout-text (org-split-clock-get-next-time-string))
+    (setq clockout-text (org-clock-split-get-next-time-string))
     
     (forward-line 1)
     (move-beginning-of-line nil)
@@ -126,6 +126,6 @@ longer then the CLOCK entry's total time.
     ;; Update timestamp to reflect new value
     (org-ctrl-c-ctrl-c)))
 
-(provide 'org-split-clock)
+(provide 'org-clock-split)
 
-;;; org-split-clock.el ends here
+;;; org-clock-split.el ends here
