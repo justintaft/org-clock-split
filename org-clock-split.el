@@ -30,6 +30,9 @@
 ;;  CLOCK: [2018-08-30 Thu 13:21]--[2018-08-30 Thu 16:05] =>  2:44"
 
 ;;; Code:
+(require 'cl-lib)
+(require 'org)
+
 (defun org-clock-split-split-time-string-to-minutes (time-string)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
