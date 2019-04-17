@@ -2,7 +2,7 @@
 
 ;; Author: Justin Taft <https://github.com/justintaft>
 ;; Keywords: calendar
-;; URL: https://github.com/justintaft/emacs-org-clock-split
+;; URL: https://github.com/justintaft/org-clock-split
 ;; Version: 1.0
 ;; Package-Requires: ((emacs "24"))
 
