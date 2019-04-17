@@ -9,6 +9,7 @@
 ;;; Contributors
 ;;  https://github.com/swflint
 ;;  https://github.com/alphapapa
+;;  https://github.com/miguelmorin
 
 ;;; Commentary:
 ;;
@@ -34,30 +35,40 @@
 (require 'org)
 
 (defun org-clock-split-split-time-string-to-minutes (time-string)
+  (interactive)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
-   TIME-STRING - Time offset to split record at.  (Ex '1h', '01m', '68m1h')"
+   TIME-STRING - Time offset to split record at.  (Ex '1h', '01m', '68m1h', '1:05')"
   
   ;; Remove all whitespace from string for sanity checks.
   ;; Used to ensure all characters are processed.
   (if (string-match "[ \t]+" time-string)
       (setq time-string (replace-match  "" t t time-string)))
 
-  (let ((total-minutes 0)
-        (matched-input-characters 0))
+  (if (string-match ":" time-string)
+      (progn
+	(setq time-array (split-string time-string ":"))
+	(if (/= 2 (length time-array))
+	    (error "Invalid time string format. Can you write 0:05 for 0h5m, for example?")
+	  )
+	(+ (* 60 (string-to-number (car time-array))) (string-to-number (car (cdr time-array))))
+	)
+    (let ((total-minutes 0)
+          (matched-input-characters 0))
+      
+      (when (string-match "\\([0-9]+\\)h" time-string)
+	(cl-incf total-minutes (* 60 (string-to-number (match-string 1 time-string))))
+	(cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
+      
+      (when (string-match "\\([0-9]+\\)m" time-string)
+	(cl-incf total-minutes (string-to-number (match-string 1 time-string)))
+	(cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
+      
+      (if (/= matched-input-characters (length time-string))
+          (error "Invalid time string format"))
 
-    (when (string-match "\\([0-9]+\\)h" time-string)
-      (cl-incf total-minutes (* 60 (string-to-number (match-string 1 time-string))))
-      (cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
-
-    (when (string-match "\\([0-9]+\\)m" time-string)
-      (cl-incf total-minutes (string-to-number (match-string 1 time-string)))
-      (cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
-    
-    (if (/= matched-input-characters (length time-string))
-        (error "Invalid time string format"))
-
-    total-minutes))
+      total-minutes))
+  )
 
 (defun org-clock-split-get-next-time-string ()
   "Gets next time string in CLOCK entry in buffer relative to cursor position."
