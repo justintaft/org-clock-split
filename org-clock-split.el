@@ -32,6 +32,7 @@
 ;;; Code:
 (require 'cl-lib)
 (require 'org)
+(require 'ert)
 
 (defvar org-clock-split-inactive-timestamp-hm (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" (cdr org-time-stamp-formats)))
   "Inactive timestamp with hours and minutes. I don't know where org mode provides it, or why it doesn't.")
