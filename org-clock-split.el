@@ -9,6 +9,7 @@
 ;;; Contributors
 ;;  https://github.com/swflint
 ;;  https://github.com/alphapapa
+;;  https://github.com/miguelmorin
 
 ;;; Commentary:
 ;;
