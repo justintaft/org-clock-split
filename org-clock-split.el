@@ -115,7 +115,7 @@ longer then the CLOCK entry's total time.
 
   (interactive "sTime offset to split clock entry (ex 1h2m): ")
 
-  (let ((parsed-minutes (org-clock-split-split-time-string-to-minutes time-string))
+  (let ((parsed-minutes (org-clock-split-splitter-string-to-minutes time-string))
         original-line clockin-text clockout-text temp-position)
     
     ;; Copy line
