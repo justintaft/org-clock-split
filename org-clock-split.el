@@ -36,6 +36,9 @@
 (defvar org-clock-split-inactive-timestamp-hm (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" (cdr org-time-stamp-formats)))
   "Inactive timestamp with hours and minutes. I don't know where org mode provides it, or why it doesn't.")
 
+(defvar org-clock-split-clock-range-regexp (concat "^" org-clock-string " " org-tr-regexp-both)
+  "Regular expression to match a clock range, possibly without the interval calculation at the end ('=> hh:mm').")
+
 (defun org-clock-split-splitter-string-to-minutes (splitter-string)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
@@ -123,8 +126,8 @@ longer then the CLOCK entry's total time.
     (setq original-line (buffer-substring (line-beginning-position) (line-beginning-position 2)))
 
     ;; Error if CLOCK line does not contain check in and check out time
-    (if (not (string-match  org-ts-regexp-both  original-line))
-        (error "Cursor must be placed on line with valid CLOCK entry"))
+    (unless (string-match org-clock-split-clock-range-regexp original-line)
+      (error "Cursor must be placed on line with valid CLOCK entry range"))
 
     (move-end-of-line nil)
     (newline)
