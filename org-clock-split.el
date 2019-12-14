@@ -59,6 +59,21 @@ Throws error when invalid time string is given.
 
     total-minutes))
 
+(defun org-clock-split-get-timestrings (tr-string)
+  "Gets the clock-in and clock-out timestrings from a time range string."
+  (let* ((t1-start (string-match org-ts-regexp-both tr-string 0))
+	 (t1-end (match-end 0))
+	 (t2-start (string-match org-ts-regexp-both tr-string t1-end))
+	 (t2-end (match-end 0))
+	 (t1 (substring tr-string t1-start t1-end))
+	 (t2 (substring tr-string t2-start t2-end)))
+    (t1 t2)))
+
+(ert-deftest org-clock-split-get-timestrings-test ()
+  (should (equal
+	   (org-clock-split-get-timestrings "CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24")
+	   '("[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:44]"))))
+
 (defun org-clock-split-get-next-time-string ()
   "Gets next time string in CLOCK entry in buffer relative to cursor position."
   (let (time-string first-position)
