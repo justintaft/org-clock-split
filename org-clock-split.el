@@ -39,6 +39,9 @@
 (defvar org-clock-split-clock-range-regexp (concat "^" org-clock-string " " org-tr-regexp-both)
   "Regular expression to match a clock range, possibly without the interval calculation at the end ('=> hh:mm').")
 
+(defvar org-clock-split-clock-range-format (concat org-clock-string " %s--%s")
+  "Format for inserting a clock range with two timestamps as arguments.")
+
 (defun org-clock-split-splitter-string-to-minutes (splitter-string)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
@@ -96,18 +99,7 @@ Throws error when invalid time string is given.
 	   (org-clock-split-split-line-into-timestamps "CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24" "20m")
 	   '("[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:40]" "[2019-12-14 Sat 08:44]"))))
 
-
-(defun org-clock-split-get-next-time-string ()
-  "Gets next time string in CLOCK entry in buffer relative to cursor position."
-  (let (time-string first-position)
-    (re-search-forward "\\[")
-    (backward-char)
-    (setq first-position (point))
-    (re-search-forward "\\]")
-    (setq time-string (buffer-substring first-position (point)))
-    time-string))
-
-(defun org-clock-split  (time-string)
+(defun org-clock-split (splitter-string)
   "Split CLOCK entry under cursor into two entries.
 Total time of created entries will be the same as original entry.
 
@@ -118,54 +110,30 @@ longer then the CLOCK entry's total time.
 
   (interactive "sTime offset to split clock entry (ex 1h2m): ")
 
-  (let ((parsed-minutes (org-clock-split-splitter-string-to-minutes time-string))
-        original-line clockin-text clockout-text temp-position)
+  (move-beginning-of-line nil)
+  (let ((original-line (buffer-substring (line-beginning-position) (line-beginning-position 2))))
     
-    ;; Copy line
-    (move-beginning-of-line nil)
-    (setq original-line (buffer-substring (line-beginning-position) (line-beginning-position 2)))
-
     ;; Error if CLOCK line does not contain check in and check out time
     (unless (string-match org-clock-split-clock-range-regexp original-line)
       (error "Cursor must be placed on line with valid CLOCK entry range"))
 
-    (move-end-of-line nil)
-    (newline)
-    (insert original-line)
-    (delete-char 1)
-    
-    ;; Move to previous line
-    (previous-line)
-    (previous-line)
-    
-    ;; Copy start time to end time
-    (setq clockin-text (org-clock-split-get-next-time-string))
-
-    (re-search-forward "--")
-    (kill-line)
-    (insert clockin-text)
-    
-    ;; Update timestamp with parsed minutes
-    (org-timestamp-change parsed-minutes  'minute)
-    
-    ;; Create copy of created end time, as new record
-    ;; will start at this time.
-    (re-search-backward "]-")
-    (setq clockout-text (org-clock-split-get-next-time-string))
-    
-    (forward-line 1)
-    (move-beginning-of-line nil)
-
-    (re-search-forward "\\[")
-    (backward-char)
-    (setq tmp-position (point))
-    (re-search-forward "\\]")
-    (delete-region tmp-position (point))
-
-    (insert clockout-text)
-    
-    ;; Update timestamp to reflect new value
-    (org-ctrl-c-ctrl-c)))
+    (let* ((timestamps (org-clock-split-split-line-into-timestamps original-line splitter-string))
+	   (t0 (pop timestamps))
+	   (t1 (pop timestamps))
+	   (t2 (pop timestamps)))
+      (kill-line)
+      ;; insert the earlier segment
+      (insert (format org-clock-split-clock-range-format t0 t1))
+      ;; Update interval duration, which moves point to the end of the later timestamp
+      (org-ctrl-c-ctrl-c)
+      ;; insert the later segment before the earlier segment, so it's ready for org-clock-merge
+      (move-beginning-of-line nil)
+      (newline)
+      (previous-line)
+      (insert (format org-clock-split-clock-range-format t1 t2))
+      ;; Update interval duration, which fails if point doesn't move to beginning of line
+      (org-ctrl-c-ctrl-c)
+      (move-beginning-of-line nil))))
 
 (provide 'org-clock-split)
 
