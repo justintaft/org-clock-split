@@ -38,10 +38,10 @@
 (defvar org-clock-split-inactive-timestamp-hm (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" (cdr org-time-stamp-formats)))
   "Inactive timestamp with hours and minutes. I don't know where org mode provides it, or why it doesn't.")
 
-(defvar org-clock-split-clock-range-regexp (concat "^" org-clock-string " " org-tr-regexp-both)
+(defvar org-clock-split-clock-range-regexp (concat "\\(^\\s-*\\)\\(" org-clock-string " " org-tr-regexp-both "\\)")
   "Regular expression to match a clock range, possibly without the interval calculation at the end ('=> hh:mm').")
 
-(defvar org-clock-split-clock-range-format (concat org-clock-string " %s--%s")
+(defvar org-clock-split-clock-range-format (concat "%s" org-clock-string " %s--%s")
   "Format for inserting a clock range with two timestamps as arguments.")
 
 (defun org-clock-split-splitter-string-to-minutes (splitter-string)
@@ -101,6 +101,11 @@ Throws error when invalid time string is given.
 	   (org-clock-split-split-line-into-timestamps "CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24" "20m")
 	   '("[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:40]" "[2019-12-14 Sat 08:44]"))))
 
+(ert-deftest org-clock-split-invalid-clock-match-test ()
+  (should (equal
+           (string-match org-clock-split-clock-range-regexp(concat org-clock-string ": [2019-12-14 Sat 08:20]"))
+           nil)))
+
 (defun org-clock-split (splitter-string)
   "Split CLOCK entry under cursor into two entries.
 Total time of created entries will be the same as original entry.
@@ -119,20 +124,21 @@ longer then the CLOCK entry's total time.
     (unless (string-match org-clock-split-clock-range-regexp original-line)
       (error "Cursor must be placed on line with valid CLOCK entry range"))
 
-    (let* ((timestamps (org-clock-split-split-line-into-timestamps original-line splitter-string))
+    (let* ((whitespace (match-string 1 original-line))
+           (timestamps (org-clock-split-split-line-into-timestamps original-line splitter-string))
 	   (t0 (pop timestamps))
 	   (t1 (pop timestamps))
 	   (t2 (pop timestamps)))
       (kill-line)
       ;; insert the earlier segment
-      (insert (format org-clock-split-clock-range-format t0 t1))
+      (insert (format org-clock-split-clock-range-format whitespace t0 t1))
       ;; Update interval duration, which moves point to the end of the later timestamp
       (org-ctrl-c-ctrl-c)
       ;; insert the later segment before the earlier segment, so it's ready for org-clock-merge
       (move-beginning-of-line nil)
       (newline)
       (previous-line)
-      (insert (format org-clock-split-clock-range-format t1 t2))
+      (insert (format org-clock-split-clock-range-format whitespace t1 t2))
       ;; Update interval duration, which fails if point doesn't move to beginning of line
       (org-ctrl-c-ctrl-c)
       (move-beginning-of-line nil))))
