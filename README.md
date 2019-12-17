@@ -19,5 +19,6 @@ Clocked some time in but want to split it up into multiple entries? Worry no mor
 
 ### Contributors
 
-https://github.com/alphapapa 
-https://github.com/swflint
+https://github.com/alphapapa . 
+https://github.com/swflint . 
+https://github.com/miguelmorin
