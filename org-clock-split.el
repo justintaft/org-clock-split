@@ -72,6 +72,9 @@ Throws error when invalid time string is given.
 
 (defun org-clock-split-get-timestrings (tr-string)
   "Gets the clock-in and clock-out timestrings from a time range string."
+
+  
+
   (let* ((t1-start (string-match org-ts-regexp-both tr-string 0))
 	 (t1-end (match-end 0))
 	 (t2-start (string-match org-ts-regexp-both tr-string t1-end))
@@ -106,6 +109,100 @@ Throws error when invalid time string is given.
            (string-match org-clock-split-clock-range-regexp(concat org-clock-string ": [2019-12-14 Sat 08:20]"))
            nil)))
 
+
+(defun org-clock-split-get-current-line-text ()
+  "Returns the text of the current lin the cursor is on"
+  (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
+
+
+(defun org-clock-split-get-next-line-text ()
+  "Returns the text of next line relative to the cursor.
+   If another line does not exist, an error is raised."
+
+
+  ;;Check to see if there is another line.
+  (let ((current-line-number (line-number-at-pos nil nil)))
+    (save-excursion
+      (forward-line 1)
+      (when (= current-line-number (line-number-at-pos nil nil))
+        (error "No line exists below the current line."))
+      (org-clock-split-get-current-line-text))))
+
+   
+
+(defun org-clock-split--merge-lines (first-line second-line)
+
+  (unless (org-clock-split--is-valid-clock-linep first-line)
+    (error "Can not merge clock entries. The first line is not a valid clock entry."))
+
+  (unless (org-clock-split--is-valid-clock-linep second-line)
+    (error "Can not merge clock entries. The second line is not a valid clock entry."))
+
+  (let* ((first-line-timestamps (org-clock-split-get-timestrings first-line))
+         (second-line-timestamps (org-clock-split-get-timestrings second-line)))
+
+     ;TODO add additional checks to verify timestamps are continious and do not overlap
+     (unless (string= (first first-line-timestamps) (first (last second-line-timestamps)))
+       (error "Timestamps are not continuous."))
+
+     (concat org-clock-string " " (first second-line-timestamps) "--" (first (last first-line-timestamps)))))
+
+(ert-deftest org-clock-split-merge-line-test ()
+  (should (equal
+           (format "%s %s--%s"  org-clock-string "[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:30]")
+           (org-clock-split--merge-lines
+             (format "%s %s--%s" org-clock-string "[2019-12-14 Sat 08:25]" "[2019-12-14 Sat 08:30]")
+             (format "%s %s--%s" org-clock-string "[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:25]")))))
+           
+
+(ert-deftest org-clock-split-merge-invalid-line-test ()
+  ;Note the first string has a missing square bracket for it's first time
+  (should-error (org-clock-split--merge-lines
+                  (format "%s %s--%s" org-clock-string "[2019-12-14 Sat 08:25" "[2019-12-14 Sat 08:30]")
+                  (format "%s %s--%s" org-clock-string "[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:25]"))))
+
+
+(defun org-clock-split-merge (arg)
+  "Merges current CLOCK line with next CLOCK line.
+   Requires timestamp ranges to be continious (ie, start time of 1st line is the end time of 2nd line.)
+
+   Universal argument ARG overrides the test and merges 
+   the lines even if the ranges do not overlap."
+
+   (interactive "P")
+   (let* ((first-line (org-clock-split-get-current-line-text))
+          (second-line (org-clock-split-get-next-line-text))
+          (merged-clock-line (org-clock-split--merge-lines first-line second-line)))
+
+     ;Remove first line, and clear out second line
+     (kill-whole-line)
+     (move-beginning-of-line nil)
+     (kill-line)
+
+     ;Insert new clock entry
+     (insert merged-clock-line)
+
+     ;Update timestamp line
+     (org-ctrl-c-ctrl-c)))
+
+
+  
+
+(defun org-clock-split--is-valid-clock-linep (string)
+   "Return t if string is valid CLOCK string, else nil."
+    (when (string-match org-clock-split-clock-range-regexp string)
+      t))
+
+(ert-deftest org-clock-split--is-valid-clock-linep-tests ()
+  (should (equal
+           t 
+           (org-clock-split--is-valid-clock-linep (format "%s %s--%s"  org-clock-string "[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:30]"))))
+
+  (should (equal
+           nil 
+           (org-clock-split--is-valid-clock-linep (format "%s %s"  org-clock-string "[2019-12-14 Sat 08:20]")))))
+
+
 (defun org-clock-split (splitter-string)
   "Split CLOCK entry under cursor into two entries.
 Total time of created entries will be the same as original entry.
@@ -121,7 +218,7 @@ longer then the CLOCK entry's total time.
   (let ((original-line (buffer-substring (line-beginning-position) (line-beginning-position 2))))
     
     ;; Error if CLOCK line does not contain check in and check out time
-    (unless (string-match org-clock-split-clock-range-regexp original-line)
+    (unless (org-clock-split--is-valid-clock-linep original-line)
       (error "Cursor must be placed on line with valid CLOCK entry range"))
 
     (let* ((whitespace (match-string 1 original-line))
