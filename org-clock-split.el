@@ -80,11 +80,6 @@ Throws error when invalid time string is given.
 	 (t2 (substring tr-string t2-start t2-end)))
     (list t1 t2)))
 
-(ert-deftest org-clock-split-get-timestrings-test ()
-  (should (equal
-	   (org-clock-split-get-timestrings "CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24")
-	   '("[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:44]"))))
-
 (defun org-clock-split-split-line-into-timestamps (original-line splitter-string)
   "Splits the clock range in original-line by splitter-string, currently a duration segment such as 1h02m."
   (let* ((parsed-minutes (org-clock-split-splitter-string-to-minutes splitter-string))
@@ -95,16 +90,6 @@ Throws error when invalid time string is given.
 	 (t1 (+ t0 (* 60 parsed-minutes)))
 	 (t1string (format-time-string org-clock-split-inactive-timestamp-hm t1)))
     (list t0string t1string t2string)))
-
-(ert-deftest org-clock-split-split-line-test ()
-  (should (equal
-	   (org-clock-split-split-line-into-timestamps "CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24" "20m")
-	   '("[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:40]" "[2019-12-14 Sat 08:44]"))))
-
-(ert-deftest org-clock-split-invalid-clock-match-test ()
-  (should (equal
-           (string-match org-clock-split-clock-range-regexp(concat org-clock-string ": [2019-12-14 Sat 08:20]"))
-           nil)))
 
 (defun org-clock-split (splitter-string)
   "Split CLOCK entry under cursor into two entries.
