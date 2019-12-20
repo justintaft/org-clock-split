@@ -2,8 +2,8 @@
 
 ;; Author: Justin Taft <https://github.com/justintaft>
 ;; Keywords: calendar
-;; URL: https://github.com/justintaft/org-clock-split
-;; Version: 1.0
+;; URL: https://github.com/justintaft/emacs-org-clock-split
+;; Version: 1.1
 ;; Package-Requires: ((emacs "24"))
 
 ;;; Contributors
@@ -33,54 +33,65 @@
 ;;; Code:
 (require 'cl-lib)
 (require 'org)
+(require 'ert)
 
-(defun org-clock-split-split-time-string-to-minutes (time-string)
-  (interactive)
+(defvar org-clock-split-inactive-timestamp-hm (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" (cdr org-time-stamp-formats)))
+  "Inactive timestamp with hours and minutes. I don't know where org mode provides it, or why it doesn't.")
+
+(defvar org-clock-split-clock-range-regexp (concat "\\(^\\s-*\\)\\(" org-clock-string " " org-tr-regexp-both "\\)")
+  "Regular expression to match a clock range, possibly without the interval calculation at the end ('=> hh:mm').")
+
+(defvar org-clock-split-clock-range-format (concat "%s" org-clock-string " %s--%s")
+  "Format for inserting a clock range with two timestamps as arguments.")
+
+(defun org-clock-split-splitter-string-to-minutes (splitter-string)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
-   TIME-STRING - Time offset to split record at.  (Ex '1h', '01m', '68m1h', '1:05')"
+   SPLITTER-STRING - Time offset to split record at.  (Ex '1h', '01m', '68m1h')"
   
   ;; Remove all whitespace from string for sanity checks.
   ;; Used to ensure all characters are processed.
-  (if (string-match "[ \t]+" time-string)
-      (setq time-string (replace-match  "" t t time-string)))
+  (if (string-match "[ \t]+" splitter-string)
+      (setq splitter-string (replace-match  "" t t splitter-string)))
 
-  (if (string-match ":" time-string)
-      (progn
-	(setq time-array (split-string time-string ":"))
-	(if (/= 2 (length time-array))
-	    (error "Invalid time string format. Can you write 0:05 for 0h5m, for example?")
-	  )
-	(+ (* 60 (string-to-number (car time-array))) (string-to-number (car (cdr time-array))))
-	)
-    (let ((total-minutes 0)
-          (matched-input-characters 0))
-      
-      (when (string-match "\\([0-9]+\\)h" time-string)
-	(cl-incf total-minutes (* 60 (string-to-number (match-string 1 time-string))))
-	(cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
-      
-      (when (string-match "\\([0-9]+\\)m" time-string)
-	(cl-incf total-minutes (string-to-number (match-string 1 time-string)))
-	(cl-incf matched-input-characters (+ 1 (length (match-string 1 time-string)))))
-      
-      (if (/= matched-input-characters (length time-string))
-          (error "Invalid time string format"))
+  (let ((total-minutes 0)
+        (matched-input-characters 0))
 
-      total-minutes))
-  )
+    (when (string-match "\\([0-9]+\\)h" splitter-string)
+      (cl-incf total-minutes (* 60 (string-to-number (match-string 1 splitter-string))))
+      (cl-incf matched-input-characters (+ 1 (length (match-string 1 splitter-string)))))
 
-(defun org-clock-split-get-next-time-string ()
-  "Gets next time string in CLOCK entry in buffer relative to cursor position."
-  (let (time-string first-position)
-    (re-search-forward "\\[")
-    (backward-char)
-    (setq first-position (point))
-    (re-search-forward "\\]")
-    (setq time-string (buffer-substring first-position (point)))
-    time-string))
+    (when (string-match "\\([0-9]+\\)m" splitter-string)
+      (cl-incf total-minutes (string-to-number (match-string 1 splitter-string)))
+      (cl-incf matched-input-characters (+ 1 (length (match-string 1 splitter-string)))))
+    
+    (if (/= matched-input-characters (length splitter-string))
+        (error "Invalid time string format"))
 
-(defun org-clock-split  (time-string)
+    total-minutes))
+
+(defun org-clock-split-get-timestrings (tr-string)
+  "Gets the clock-in and clock-out timestrings from a time range string."
+  (let* ((t1-start (string-match org-ts-regexp-both tr-string 0))
+	 (t1-end (match-end 0))
+	 (t2-start (string-match org-ts-regexp-both tr-string t1-end))
+	 (t2-end (match-end 0))
+	 (t1 (substring tr-string t1-start t1-end))
+	 (t2 (substring tr-string t2-start t2-end)))
+    (list t1 t2)))
+
+(defun org-clock-split-split-line-into-timestamps (original-line splitter-string)
+  "Splits the clock range in original-line by splitter-string, currently a duration segment such as 1h02m."
+  (let* ((parsed-minutes (org-clock-split-splitter-string-to-minutes splitter-string))
+	 (timestring-pair (org-clock-split-get-timestrings original-line))
+	 (t0string (pop timestring-pair))
+	 (t2string (pop timestring-pair))
+	 (t0 (float-time (apply #'encode-time (org-parse-time-string t0string))))
+	 (t1 (+ t0 (* 60 parsed-minutes)))
+	 (t1string (format-time-string org-clock-split-inactive-timestamp-hm t1)))
+    (list t0string t1string t2string)))
+
+(defun org-clock-split (splitter-string)
   "Split CLOCK entry under cursor into two entries.
 Total time of created entries will be the same as original entry.
 
@@ -91,54 +102,31 @@ longer then the CLOCK entry's total time.
 
   (interactive "sTime offset to split clock entry (ex 1h2m): ")
 
-  (let ((parsed-minutes (org-clock-split-split-time-string-to-minutes time-string))
-        original-line clockin-text clockout-text temp-position)
+  (move-beginning-of-line nil)
+  (let ((original-line (buffer-substring (line-beginning-position) (line-beginning-position 2))))
     
-    ;; Copy line
-    (move-beginning-of-line nil)
-    (setq original-line (buffer-substring (line-beginning-position) (line-beginning-position 2)))
-
     ;; Error if CLOCK line does not contain check in and check out time
-    (if (not (string-match  org-ts-regexp-both  original-line))
-        (error "Cursor must be placed on line with valid CLOCK entry"))
+    (unless (string-match org-clock-split-clock-range-regexp original-line)
+      (error "Cursor must be placed on line with valid CLOCK entry range"))
 
-    (move-end-of-line nil)
-    (newline)
-    (insert original-line)
-    (delete-char 1)
-    
-    ;; Move to previous line
-    (previous-line)
-    (previous-line)
-    
-    ;; Copy start time to end time
-    (setq clockin-text (org-clock-split-get-next-time-string))
-
-    (re-search-forward "--")
-    (kill-line)
-    (insert clockin-text)
-    
-    ;; Update timestamp with parsed minutes
-    (org-timestamp-change parsed-minutes  'minute)
-    
-    ;; Create copy of created end time, as new record
-    ;; will start at this time.
-    (re-search-backward "]-")
-    (setq clockout-text (org-clock-split-get-next-time-string))
-    
-    (forward-line 1)
-    (move-beginning-of-line nil)
-
-    (re-search-forward "\\[")
-    (backward-char)
-    (setq tmp-position (point))
-    (re-search-forward "\\]")
-    (delete-region tmp-position (point))
-
-    (insert clockout-text)
-    
-    ;; Update timestamp to reflect new value
-    (org-ctrl-c-ctrl-c)))
+    (let* ((whitespace (match-string 1 original-line))
+           (timestamps (org-clock-split-split-line-into-timestamps original-line splitter-string))
+	   (t0 (pop timestamps))
+	   (t1 (pop timestamps))
+	   (t2 (pop timestamps)))
+      (kill-line)
+      ;; insert the earlier segment
+      (insert (format org-clock-split-clock-range-format whitespace t0 t1))
+      ;; Update interval duration, which moves point to the end of the later timestamp
+      (org-ctrl-c-ctrl-c)
+      ;; insert the later segment before the earlier segment, so it's ready for org-clock-merge
+      (move-beginning-of-line nil)
+      (newline)
+      (previous-line)
+      (insert (format org-clock-split-clock-range-format whitespace t1 t2))
+      ;; Update interval duration, which fails if point doesn't move to beginning of line
+      (org-ctrl-c-ctrl-c)
+      (move-beginning-of-line nil))))
 
 (provide 'org-clock-split)
 

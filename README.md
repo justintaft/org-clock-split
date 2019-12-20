@@ -1,4 +1,4 @@
-Split org-mode CLOCK entry while preserving time.
+Split org-mode CLOCK entry while preserving time.  [![Build Status](https://travis-ci.org/justintaft/org-clock-split.svg?branch=master)](https://travis-ci.org/justintaft/org-clock-split)
 
 Clocked some time in but want to split it up into multiple entries? Worry no more!  Place the cursor on a CLOCK entry and run `org-clock-split`. Type in a offset to split the record at, such as "15m1h", and voilà!  The entry will be replaced with TWO clock entries, preserving the total amount of time of the original entry.  
 
@@ -19,5 +19,6 @@ Clocked some time in but want to split it up into multiple entries? Worry no mor
 
 ### Contributors
 
-https://github.com/alphapapa 
-https://github.com/swflint
+https://github.com/alphapapa . 
+https://github.com/swflint . 
+https://github.com/miguelmorin
