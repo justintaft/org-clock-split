@@ -34,6 +34,7 @@
 (require 'cl-lib)
 (require 'org)
 (require 'ert)
+(require 'seq)
 
 (defvar org-clock-split-inactive-timestamp-hm (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" (cdr org-time-stamp-formats)))
   "Inactive timestamp with hours and minutes. I don't know where org mode provides it, or why it doesn't.")
@@ -44,7 +45,22 @@
 (defvar org-clock-split-clock-range-format (concat "%s" org-clock-string " %s--%s")
   "Format for inserting a clock range with two timestamps as arguments.")
 
-(defun org-clock-split-splitter-string-to-minutes (splitter-string)
+(defun org-clock-split-absolute-string-to-hm (splitter-string)
+  "Return pair of hours and minutes from the timestring.
+
+    SPLITTER-STRING - Absolute time to split record at (Ex
+    '9:20')"
+
+  (let (hour minute)
+    (progn ;; wrap in progn to avoid scrapping match data, which is global
+      (if (string-match "\\([0-9]?[0-9]\\):\\([0-9]\\{2\\}\\)" splitter-string)
+	  (progn
+	    (setq hour (match-string 1 splitter-string))
+	    (setq minute (match-string 2 splitter-string))
+	    (seq-map #'string-to-number (list hour minute)))
+	(error "Input must be a valid absolute time, e.g. 9:20.")))))
+
+(defun org-clock-split-relative-string-to-seconds (splitter-string)
   "Return minutes given a time string in format.
 Throws error when invalid time string is given.
    SPLITTER-STRING - Time offset to split record at.  (Ex '1h', '01m', '68m1h')"
@@ -68,7 +84,7 @@ Throws error when invalid time string is given.
     (if (/= matched-input-characters (length splitter-string))
         (error "Invalid time string format"))
 
-    total-minutes))
+    (* 60 total-minutes)))
 
 (defun org-clock-split-get-timestrings (tr-string)
   "Gets the clock-in and clock-out timestrings from a time range string."
@@ -80,27 +96,85 @@ Throws error when invalid time string is given.
 	 (t2 (substring tr-string t2-start t2-end)))
     (list t1 t2)))
 
-(defun org-clock-split-split-line-into-timestamps (original-line splitter-string)
-  "Splits the clock range in original-line by splitter-string, currently a duration segment such as 1h02m."
-  (let* ((parsed-minutes (org-clock-split-splitter-string-to-minutes splitter-string))
-	 (timestring-pair (org-clock-split-get-timestrings original-line))
-	 (t0string (pop timestring-pair))
-	 (t2string (pop timestring-pair))
-	 (t0 (float-time (apply #'encode-time (org-parse-time-string t0string))))
-	 (t1 (+ t0 (* 60 parsed-minutes)))
-	 (t1string (format-time-string org-clock-split-inactive-timestamp-hm t1)))
+(defun org-timestring-to-time (timestring)
+  "Converts the org time string to internal time."
+  (float-time (apply #'encode-time (org-parse-time-string timestring))))
+
+(defun org-clock-split-split-line-into-timestamps (original-line splitter-string from-end)
+  "Splits the clock range in ORIGINAL-LINE by SPLITTER-STRING, from the end or the start of the clock range.
+
+   ORIGINAL-LINE: a clock range from an Org buffer, such as 'CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24'
+
+   SPLITTER-STRING: either a relative duration such as 1h02m or
+    an absolute time such as 09:20. If the absolute time is
+    within the range in ORIGINAL-LINE, then FROM-END is
+    irrelevant. If it falls outside the range, the splitting
+    point will be the latest time before the end of the clock
+    range if FROM-END is t, and the first time after the
+    beginning of the clock range if FROM-END is nil.
+
+   FROM-END: whether to split from the end of the clock range or the start."
+
+  (let* ((timestring-pair (org-clock-split-get-timestrings original-line))
+        (t0string (pop timestring-pair))
+        (t0float (org-timestring-to-time t0string))
+        (t2string (pop timestring-pair))
+        (t2float (org-timestring-to-time t2string))
+        (absolute (cl-search ":" splitter-string))
+	t1float
+	;; deal with negative strings, which split from the end
+	(negative-splitter (string= "-" (substring splitter-string 0 1)))
+	(from-end-local from-end)
+	(splitter-string-local splitter-string)
+	)
+    (if negative-splitter
+	(setq from-end-local t
+	      splitter-string-local (substring splitter-string 1)))
+    ;; assign splitting time provisionally, will be updated in the logic
+    (setq t1string (if from-end-local t2string t0string))
+    (if absolute
+       (let* ((pair (org-clock-split-absolute-string-to-hm splitter-string-local))
+              (hours (pop pair))
+              (minutes (pop pair))
+              (t1-tuple (org-parse-time-string t1string))
+              (t1-tuple (append (list 0 minutes hours) (seq-subseq t1-tuple 3)))
+              (t1float (float-time (apply #'encode-time t1-tuple))))
+         ;; update the splitting time so it's later than t0 or earlier than t2, depending on FROM-END
+         (if from-end-local
+             (when (> t1float t2float)
+               (setq t1-tuple (append (seq-subseq t1-tuple 0 3) (list (1- (nth 3 t1-tuple))) (seq-subseq t1-tuple 4))))
+           (when (< t1float t0float)
+             (setq t1-tuple (append (seq-subseq t1-tuple 0 3) (list (1+ (nth 3 t1-tuple))) (seq-subseq t1-tuple 4)))))
+         
+         ;; convert to float
+         (setq t1float (apply #'encode-time t1-tuple))
+         (setq t1string (format-time-string org-clock-split-inactive-timestamp-hm t1float)))
+
+         
+      ;; Handle relative duration
+      (let* ((parsed-seconds (org-clock-split-relative-string-to-seconds splitter-string-local))
+            (t1float (org-timestring-to-time t1string))
+            (t1float (if from-end-local
+                  (- t1float parsed-seconds)
+                (+ t1float parsed-seconds))))
+       (setq t1string (format-time-string org-clock-split-inactive-timestamp-hm t1float))))
     (list t0string t1string t2string)))
 
-(defun org-clock-split (splitter-string)
+(defun org-clock-split (from-end splitter-string)
   "Split CLOCK entry under cursor into two entries.
 Total time of created entries will be the same as original entry.
 
    WARNING: Negative time entries can be created if splitting at an offset
 longer then the CLOCK entry's total time.
 
-   TIME-STRING: Time offset to split record at.  Examples: '1h', '01m', '68m1h'."
+   FROM-END: nil if the function should split with duration from
+   the start of the clock segment (default for backwards
+   compatibility), t if the function should split counting from
+   the end of the clock segment.
+ 
+   SPLITTER-STRING: Time offset to split record at.  Examples: '1h', '01m', '68m1h', '9:20'."
 
-  (interactive "sTime offset to split clock entry (ex 1h2m): ")
+  (interactive "P\nsTime offset to split clock entry (ex 1h2m): ")
 
   (move-beginning-of-line nil)
   (let ((original-line (buffer-substring (line-beginning-position) (line-beginning-position 2))))
@@ -110,11 +184,12 @@ longer then the CLOCK entry's total time.
       (error "Cursor must be placed on line with valid CLOCK entry range"))
 
     (let* ((whitespace (match-string 1 original-line))
-           (timestamps (org-clock-split-split-line-into-timestamps original-line splitter-string))
+           (timestamps (org-clock-split-split-line-into-timestamps original-line splitter-string from-end))
 	   (t0 (pop timestamps))
 	   (t1 (pop timestamps))
 	   (t2 (pop timestamps)))
-      (kill-line)
+      ;; delete line without moving to kill ring
+      (delete-region (line-beginning-position) (line-end-position))
       ;; insert the earlier segment
       (insert (format org-clock-split-clock-range-format whitespace t0 t1))
       ;; Update interval duration, which moves point to the end of the later timestamp
