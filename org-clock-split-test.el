@@ -90,3 +90,39 @@ CLOCK: [2019-12-18 Wed 22:00]--[2019-12-18 Wed 22:10] =>  0:00
                              (org-clock-split nil "-8m")
                              (buffer-substring-no-properties (point-min) (point-max)))))
     (should (equal expected-buffer calculated-buffer))))
+
+(ert-deftest org-timestamp-test ()
+  (should (equal
+           (org-clock-split-get-clock-segment-timestamps "CLOCK: [2019-09-26 Thu 00:29]--[2019-09-26 Thu 01:11] => 0:42")
+           '("2019-09-26 Thu 00:29" "2019-09-26 Thu 01:11"))))
+
+(ert-deftest org-clock-merge-system-test ()
+  (let ((expected-buffer "\
+* Test
+  :LOGBOOK:
+  CLOCK: [2019-12-18 Wed 22:00]--[2019-12-18 Wed 22:10] =>  0:10
+  CLOCK: [2019-12-17 Wed 22:00]--[2019-12-17 Wed 22:10] =>  0:10
+  :END:")
+        (calculated-buffer (with-temp-buffer
+                             (erase-buffer)
+                             (org-mode)
+                             (insert "\
+* Test
+  :LOGBOOK:
+CLOCK: [2019-12-18 Wed 22:02]--[2019-12-18 Wed 22:10] =>  0:08
+CLOCK: [2019-12-18 Wed 22:00]--[2019-12-18 Wed 22:02] =>  0:02
+  CLOCK: [2019-12-17 Tue 22:04]--[2019-12-17 Wed 22:10] =>  0:08
+  CLOCK: [2019-12-17 Wed 22:00]--[2019-12-17 Tue 22:02] =>  0:02
+  :END:")
+                             (outline-show-all)
+                             (beginning-of-buffer)
+                             (next-line)
+                             (next-line)
+                             (next-line)
+                             (next-line)
+                             (org-clock-merge)
+                             (previous-line)
+                             (previous-line)
+                             (org-clock-merge)
+                             (buffer-substring-no-properties (point-min) (point-max)))))
+    (should (equal expected-buffer calculated-buffer))))
