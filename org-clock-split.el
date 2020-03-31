@@ -45,6 +45,12 @@
 (defvar org-clock-split-clock-range-format (concat "%s" org-clock-string " %s--%s")
   "Format for inserting a clock range with two timestamps as arguments.")
 
+(defvar org-clock-split-clock-range-format-no-brackets (concat "%s" org-clock-string " [%s]--[%s]")
+  "Format for inserting a clock range with two timestamps without delimiters as arguments.")
+
+(defvar org-clock-split-merge-tolerance-minutes 2
+  "Tolerance in seconds to merge two clock segments.")
+
 (defun org-clock-split-absolute-string-to-hm (splitter-string)
   "Return pair of hours and minutes from the timestring.
 
@@ -202,6 +208,78 @@ longer then the CLOCK entry's total time.
       ;; Update interval duration, which fails if point doesn't move to beginning of line
       (org-ctrl-c-ctrl-c)
       (move-beginning-of-line nil))))
+
+(defun org-clock-split-get-clock-segment-timestamps (line)
+  "Parses a clock segment line and returns the first and last timestamps in a list."
+  (let* ((org-clock-regexp (concat "CLOCK: " org-ts-regexp3 "--" org-ts-regexp3))
+	 (t1 (if (string-match org-clock-regexp line)
+		 (match-string 1 line)
+	       (user-error "The argument must have a valid CLOCK range")))
+	 (t2 (match-string 9 line)))
+    (list t1 t2)))
+
+(defun org-clock-split-compute-timestamp-difference (later-timestamp earlier-timestamp)
+  "Computes the number of seconds difference in string timestamps as a float."
+  (-
+   (float-time (apply #'encode-time (org-parse-time-string later-timestamp)))
+   (float-time (apply #'encode-time (org-parse-time-string earlier-timestamp)))))
+
+(defun org-clock-split-float-time-diff-to-hours-minutes (diff)
+  "Returns a float time difference in hh:mm format."
+  (let* ((hours (floor (/ diff 3600)))
+	 (diff_minus_hours (- diff (* 3600 hours)))
+	 (minutes (floor (/ diff_minus_hours 60))))
+    (car (split-string (format "%2d:%02d" hours minutes)))))
+
+(defun org-clock-merge (&optional skip-merge-with-time-discrepancy)
+  "Merge the org CLOCK line with the next CLOCK line. If the last
+timestamp of the current line equals the first timestamp of the
+next line with a tolerance of up to org-clock-split-merge-tolerance-minutes, then merge
+automatically. If a discrepancy exists, prompt the user for
+confirmation, unless skip-merge-with-time-discrepancy is
+non-nil."
+
+  (interactive "P")
+  (let* ((first-line-start (line-beginning-position))
+	 (first-line (buffer-substring
+		      (line-beginning-position) (line-end-position)))
+	 (first-line-timestamps (org-clock-split-get-clock-segment-timestamps first-line))
+	 (first-line-t1 (pop first-line-timestamps))
+	 (first-line-t2 (pop first-line-timestamps))
+	 (first-line-t2 (match-string 9 first-line))
+	 (second-line (progn
+			(forward-line)
+			(buffer-substring
+			 (line-beginning-position) (line-end-position))))
+	 (second-line-timestamps (org-clock-split-get-clock-segment-timestamps second-line))
+	 (second-line-t1 (pop second-line-timestamps))
+	 (second-line-t2 (pop second-line-timestamps))
+	 (diff (org-clock-split-compute-timestamp-difference first-line-t1 second-line-t2))
+	 whitespace)
+
+    ;; grab whitespace to maintain it
+    (progn
+      (let ((temp (string-match org-clock-split-clock-range-regexp first-line)))
+	(setq whitespace (match-string 1 first-line))))
+
+    ;; ignore discrepancies of 2 minutes or less
+    (when (> diff (* 60 org-clock-split-merge-tolerance-minutes))
+      (when skip-merge-with-time-discrepancy
+	(error "Skipping clock-merge"))
+      (unless (yes-or-no-p (concat (org-clock-split-float-time-diff-to-hours-minutes diff)
+				   " discrepancy in times to merge. Proceed anyway?"))
+	(user-error "Cancelled merge")))
+
+    ;; remove the two lines
+    (delete-region first-line-start (line-end-position))
+    ;; indent
+    (org-cycle)
+    ;; insert new time range
+    (message (concat "'" whitespace "'"))
+    (insert (format org-clock-split-clock-range-format-no-brackets whitespace second-line-t1 first-line-t2))
+    ;; generate duration
+    (org-evaluate-time-range)
+    ))
 
 (provide 'org-clock-split)
 
