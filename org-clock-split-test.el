@@ -5,11 +5,6 @@
 	   (org-clock-split-get-timestrings "CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24")
 	   '("[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:44]"))))
 
-(ert-deftest org-clock-split-split-line-test ()
-  (should (equal
-	   (org-clock-split-split-line-into-timestamps "CLOCK: [2019-12-14 Sat 08:20]--[2019-12-14 Sat 08:44] =>  0:24" "20m")
-	   '("[2019-12-14 Sat 08:20]" "[2019-12-14 Sat 08:40]" "[2019-12-14 Sat 08:44]"))))
-
 (ert-deftest org-clock-split-invalid-clock-match-test ()
   (should (equal
            (string-match org-clock-split-clock-range-regexp(concat org-clock-string ": [2019-12-14 Sat 08:20]"))

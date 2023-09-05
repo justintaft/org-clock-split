@@ -154,7 +154,7 @@ Throws error when invalid time string is given.
          
          ;; convert to float
          (setq t1float (apply #'encode-time t1-tuple))
-         (setq t1string (format-time-string org-clock-split-inactive-timestamp-hm t1float)))
+         (setq t1string (org-clock-split-format-inactive-time-string org-clock-split-inactive-timestamp-hm t1float)))
 
          
       ;; Handle relative duration
@@ -163,8 +163,16 @@ Throws error when invalid time string is given.
             (t1float (if from-end-local
                   (- t1float parsed-seconds)
                 (+ t1float parsed-seconds))))
-       (setq t1string (format-time-string org-clock-split-inactive-timestamp-hm t1float))))
+       (setq t1string (org-clock-split-format-inactive-time-string org-clock-split-inactive-timestamp-hm t1float))))
     (list t0string t1string t2string)))
+
+(defun org-clock-split-format-inactive-time-string (format-string &optional time zone)
+  (let ((time-string (format-time-string format-string time zone)))
+       (if (and
+            (string-equal (substring time-string 0 1) "[")
+            (string-equal (substring time-string -1) "]"))
+           time-string
+         (format "[%s]" time-string))))
 
 (defun org-clock-split (from-end splitter-string)
   "Split CLOCK entry under cursor into two entries.
