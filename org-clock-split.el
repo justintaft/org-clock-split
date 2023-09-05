@@ -36,7 +36,17 @@
 (require 'ert)
 (require 'seq)
 
-(defvar org-clock-split-inactive-timestamp-hm (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" (cdr org-time-stamp-formats)))
+(defun org-clock-split-make-inactive-time-stamp-format (format-string)
+  "Turns a given format-string into a format-string for inactive time-stamps, independent of whether it was active, inactive or had no activity."
+  (let* ((inactivated (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" format-string)))
+        (ensured (if (and
+                       (string-equal (substring inactivated 0 1) "[")
+                       (string-equal (substring inactivated -1) "]"))
+                      inactivated
+                    (format "[%s]" inactivated))))
+    ensured))
+
+(defvar org-clock-split-inactive-timestamp-hm (org-clock-split-make-inactive-time-stamp-format (cdr org-time-stamp-formats))
   "Inactive timestamp with hours and minutes. I don't know where org mode provides it, or why it doesn't.")
 
 (defvar org-clock-split-clock-range-regexp (concat "\\(^\\s-*\\)\\(" org-clock-string " " org-tr-regexp-both "\\)")
@@ -154,7 +164,7 @@ Throws error when invalid time string is given.
          
          ;; convert to float
          (setq t1float (apply #'encode-time t1-tuple))
-         (setq t1string (org-clock-split-format-inactive-time-string org-clock-split-inactive-timestamp-hm t1float)))
+         (setq t1string (format-time-string org-clock-split-inactive-timestamp-hm t1float)))
 
          
       ;; Handle relative duration
@@ -163,16 +173,8 @@ Throws error when invalid time string is given.
             (t1float (if from-end-local
                   (- t1float parsed-seconds)
                 (+ t1float parsed-seconds))))
-       (setq t1string (org-clock-split-format-inactive-time-string org-clock-split-inactive-timestamp-hm t1float))))
+       (setq t1string (format-time-string org-clock-split-inactive-timestamp-hm t1float))))
     (list t0string t1string t2string)))
-
-(defun org-clock-split-format-inactive-time-string (format-string &optional time zone)
-  (let ((time-string (format-time-string format-string time zone)))
-       (if (and
-            (string-equal (substring time-string 0 1) "[")
-            (string-equal (substring time-string -1) "]"))
-           time-string
-         (format "[%s]" time-string))))
 
 (defun org-clock-split (from-end splitter-string)
   "Split CLOCK entry under cursor into two entries.
