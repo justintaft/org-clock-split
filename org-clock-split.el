@@ -36,7 +36,17 @@
 (require 'ert)
 (require 'seq)
 
-(defvar org-clock-split-inactive-timestamp-hm (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" (cdr org-time-stamp-formats)))
+(defun org-clock-split-make-inactive-time-stamp-format (format-string)
+  "Turns a given format-string into a format-string for inactive time-stamps, independent of whether it was active, inactive or had no activity."
+  (let* ((inactivated (replace-regexp-in-string "<" "[" (replace-regexp-in-string ">" "]" format-string)))
+        (ensured (if (and
+                       (string-equal (substring inactivated 0 1) "[")
+                       (string-equal (substring inactivated -1) "]"))
+                      inactivated
+                    (format "[%s]" inactivated))))
+    ensured))
+
+(defvar org-clock-split-inactive-timestamp-hm (org-clock-split-make-inactive-time-stamp-format (cdr org-time-stamp-formats))
   "Inactive timestamp with hours and minutes. I don't know where org mode provides it, or why it doesn't.")
 
 (defvar org-clock-split-clock-range-regexp (concat "\\(^\\s-*\\)\\(" org-clock-string " " org-tr-regexp-both "\\)")
